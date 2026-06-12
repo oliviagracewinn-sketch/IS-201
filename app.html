@@ -1,0 +1,307 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Horse Jumping Game</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f7f7f7;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 20px 40px;
+    }
+    .game-shell {
+      width: 100%;
+      max-width: 900px;
+      text-align: center;
+    }
+    h1 {
+      margin: 0 0 12px;
+      font-size: 2rem;
+    }
+    .game-info {
+      margin: 0 0 16px;
+      color: #555;
+    }
+    canvas {
+      width: 100%;
+      max-width: 900px;
+      height: 300px;
+      background: #f7f7f7;
+      border: 2px solid #444;
+      border-radius: 12px;
+      display: block;
+      margin: 0 auto;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      justify-content: center;
+      margin-top: 16px;
+    }
+    .controls button,
+    .controls a {
+      border: none;
+      border-radius: 999px;
+      padding: 12px 20px;
+      font-size: 1rem;
+      cursor: pointer;
+      text-decoration: none;
+      background: #444;
+      color: #fff;
+      transition: background 0.2s ease;
+    }
+    .controls button:hover,
+    .controls a:hover {
+      background: #222;
+    }
+    .scoreboard {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 14px;
+      color: #222;
+      font-weight: 600;
+    }
+    .hint {
+      margin-top: 14px;
+      color: #777;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="game-shell">
+    <h1>Horse Jumping Game</h1>
+    <p class="game-info">Press <strong>Space</strong> or tap the button to make the horse jump over obstacles. The goal is to keep going as long as possible.</p>
+    <canvas id="gameCanvas" width="900" height="300"></canvas>
+    <div class="scoreboard">
+      <div>Score: <span id="score">0</span></div>
+      <div>Best: <span id="bestScore">0</span></div>
+    </div>
+    <div class="controls">
+      <button id="jumpBtn">Jump</button>
+      <button id="restartBtn">Restart</button>
+      <a href="scratch.html">Back to About Me</a>
+    </div>
+    <p class="hint">Tip: Jump early for low fences and later for high obstacles. The horse runs faster over time.</p>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const bestScoreEl = document.getElementById('bestScore');
+    const jumpBtn = document.getElementById('jumpBtn');
+    const restartBtn = document.getElementById('restartBtn');
+
+    const width = canvas.width;
+    const height = canvas.height;
+    const groundY = height - 50;
+
+    let running = false;
+    let score = 0;
+    let bestScore = 0;
+    let speed = 6;
+    let obstacleTimer = 0;
+    let obstacles = [];
+    let frameCount = 0;
+    let gameOver = false;
+
+    const horse = {
+      x: 100,
+      y: groundY - 40,
+      width: 48,
+      height: 40,
+      vy: 0,
+      gravity: 0.8,
+      jumpPower: -14,
+      jumping: false,
+      color: '#5c3a21'
+    };
+
+    function resetGame() {
+      running = true;
+      score = 0;
+      speed = 6;
+      obstacleTimer = 0;
+      frameCount = 0;
+      obstacles = [];
+      gameOver = false;
+      horse.y = groundY - horse.height;
+      horse.vy = 0;
+      horse.jumping = false;
+      scoreEl.textContent = score;
+    }
+
+    function spawnObstacle() {
+      const heightOptions = [20, 28, 36, 45];
+      const obstacle = {
+        x: width + 20,
+        y: groundY - 20,
+        width: 18,
+        height: heightOptions[Math.floor(Math.random() * heightOptions.length)],
+        color: '#333'
+      };
+      obstacle.y = groundY - obstacle.height;
+      obstacles.push(obstacle);
+    }
+
+    function drawHorse() {
+      ctx.fillStyle = horse.color;
+      ctx.fillRect(horse.x, horse.y, horse.width, horse.height);
+      ctx.fillStyle = '#8b6f4d';
+      ctx.fillRect(horse.x + 8, horse.y + 8, horse.width - 16, horse.height - 16);
+      ctx.fillStyle = '#333';
+      ctx.fillRect(horse.x + horse.width - 12, horse.y + 4, 10, 10);
+    }
+
+    function drawGround() {
+      ctx.fillStyle = '#7a5a38';
+      ctx.fillRect(0, groundY, width, height - groundY);
+      ctx.strokeStyle = '#5e4733';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(0, groundY);
+      ctx.lineTo(width, groundY);
+      ctx.stroke();
+    }
+
+    function drawObstacles() {
+      obstacles.forEach(obstacle => {
+        ctx.fillStyle = obstacle.color;
+        ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(obstacle.x + 2, obstacle.y + obstacle.height - 8, obstacle.width - 4, 6);
+      });
+    }
+
+    function drawText() {
+      ctx.fillStyle = '#222';
+      ctx.font = '18px Segoe UI, Tahoma, Geneva, sans-serif';
+      ctx.fillText('Look at you go!', 16, 26);
+      if (gameOver) {
+        ctx.fillStyle = '#de3c3c';
+        ctx.font = 'bold 28px Segoe UI, Tahoma, Geneva, sans-serif';
+        ctx.fillText('Game Over', width / 2 - 80, height / 2 - 20);
+        ctx.font = '16px Segoe UI, Tahoma, Geneva, sans-serif';
+        ctx.fillStyle = '#222';
+        ctx.fillText('Press Restart to try again.', width / 2 - 95, height / 2 + 10);
+      }
+    }
+
+    function updateHorse() {
+      if (horse.jumping) {
+        horse.vy += horse.gravity;
+        horse.y += horse.vy;
+        if (horse.y >= groundY - horse.height) {
+          horse.y = groundY - horse.height;
+          horse.vy = 0;
+          horse.jumping = false;
+        }
+      }
+    }
+
+    function updateObstacles() {
+      obstacles.forEach(obstacle => {
+        obstacle.x -= speed;
+      });
+      obstacles = obstacles.filter(obstacle => obstacle.x + obstacle.width > 0);
+    }
+
+    function checkCollision() {
+      return obstacles.some(obstacle => {
+        return horse.x < obstacle.x + obstacle.width &&
+               horse.x + horse.width > obstacle.x &&
+               horse.y < obstacle.y + obstacle.height &&
+               horse.y + horse.height > obstacle.y;
+      });
+    }
+
+    function updateScore() {
+      score += 0.1;
+      scoreEl.textContent = Math.floor(score);
+      if (score > bestScore) {
+        bestScore = Math.floor(score);
+        bestScoreEl.textContent = bestScore;
+      }
+    }
+
+    function gameLoop() {
+      ctx.clearRect(0, 0, width, height);
+      drawGround();
+      drawHorse();
+      drawObstacles();
+      drawText();
+
+      if (!gameOver) {
+        frameCount += 1;
+        obstacleTimer += 1;
+
+        if (obstacleTimer > 90) {
+          spawnObstacle();
+          obstacleTimer = 0;
+        }
+        if (frameCount % 200 === 0) {
+          speed += 0.6;
+        }
+        updateHorse();
+        updateObstacles();
+        if (checkCollision()) {
+          gameOver = true;
+          running = false;
+        } else {
+          updateScore();
+        }
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function jump() {
+      if (!running || gameOver) return;
+      if (!horse.jumping) {
+        horse.vy = horse.jumpPower;
+        horse.jumping = true;
+      }
+    }
+
+    jumpBtn.addEventListener('click', jump);
+    restartBtn.addEventListener('click', () => {
+      if (gameOver) {
+        resetGame();
+      }
+    });
+
+    window.addEventListener('keydown', event => {
+      if (event.code === 'Space') {
+        event.preventDefault();
+        if (!running && !gameOver) {
+          running = true;
+        }
+        if (gameOver) return;
+        jump();
+      }
+    });
+
+    canvas.addEventListener('click', () => {
+      if (!running && !gameOver) {
+        running = true;
+      }
+      if (!gameOver) {
+        jump();
+      }
+    });
+
+    resetGame();
+    gameLoop();
+  </script>
+</body>
+</html>
